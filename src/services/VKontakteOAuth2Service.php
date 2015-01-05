@@ -22,100 +22,113 @@ use OAuth\OAuth2\Service\ServiceInterface;
 class VKontakteOAuth2Service extends Service
 {
 
-	const SCOPE_FRIENDS = 'friends';
+    const SCOPE_FRIENDS = 'friends';
+    const SCOPE_EMAIL = 'email';
 
-	protected $name = 'vkontakte';
-	protected $title = 'VK.com';
-	protected $type = 'OAuth2';
-	protected $jsArguments = array('popup' => array('width' => 585, 'height' => 350));
+    protected $name = 'vkontakte';
+    protected $title = 'VK.com';
+    protected $type = 'OAuth2';
+    protected $jsArguments = array('popup' => array('width' => 585, 'height' => 350));
 
-	protected $scopes = array(self::SCOPE_FRIENDS);
-	protected $providerOptions = array(
-		'authorize' => 'http://api.vk.com/oauth/authorize',
-		'access_token' => 'https://api.vk.com/oauth/access_token',
-	);
-	protected $baseApiUrl = 'https://api.vk.com/method/';
+    protected $scopes = array(/*self::SCOPE_FRIENDS, */self::SCOPE_EMAIL);
+    protected $providerOptions = array(
+        'authorize' => 'http://api.vk.com/oauth/authorize',
+        'access_token' => 'https://api.vk.com/oauth/access_token',
+    );
+    protected $baseApiUrl = 'https://api.vk.com/method/';
 
-	protected function fetchAttributes()
-	{
-		$tokenData = $this->getAccessTokenData();
-		$info = $this->makeSignedRequest('users.get.json', array(
-			'query' => array(
-				'uids' => $tokenData['params']['user_id'],
-				'fields' => '', // uid, first_name and last_name is always available
-				//'fields' => 'nickname, sex, bdate, city, country, timezone, photo, photo_medium, photo_big, photo_rec',
-			),
-		));
+    protected function fetchAttributes()
+    {
+        $tokenData = $this->getAccessTokenData();
+        $info = $this->makeSignedRequest('users.get.json', array(
+            'query' => array(
+                'uids' => $tokenData['params']['user_id'],
+                //'fields' => '', // uid, first_name and last_name is always available
+                'fields' => 'uid, first_name, last_name, photo, photo_medium, photo_big, photo_rec, email',
+                //'fields' => 'nickname, sex, bdate, city, country, timezone, photo, photo_medium, photo_big, photo_rec',
+            ),
+        ));
 
-		$info = $info['response'][0];
+        $info = $info['response'][0];
 
-		$this->attributes['id'] = $info['uid'];
-		$this->attributes['name'] = $info['first_name'] . ' ' . $info['last_name'];
-		$this->attributes['url'] = 'http://vk.com/id' . $info['uid'];
+        $this->attributes['id'] = $info['uid'];
+        $this->attributes['name'] = $info['first_name'] . ' ' . $info['last_name'];
+        $this->attributes['url'] = 'http://vk.com/id' . $info['uid'];
+        $this->attributes['avatar'] = $info['photo_medium'];
 
-		/*if (!empty($info['nickname']))
-			$this->attributes['username'] = $info['nickname'];
-		else
-			$this->attributes['username'] = 'id'.$info['uid'];
+        if(array_key_exists('email', $tokenData['params'])) {
+            $this->attributes['email'] = $tokenData['params']['email'];
+            $this->attributes['email_confirmed'] = 1;
+        }
+        else {
+            $this->attributes['email'] = $info['uid'] . '@vk.com';
+            $this->attributes['email_confirmed'] = 0;
+        }
 
-		$this->attributes['gender'] = $info['sex'] == 1 ? 'F' : 'M';
 
-		$this->attributes['city'] = $info['city'];
-		$this->attributes['country'] = $info['country'];
+        /*if (!empty($info['nickname']))
+            $this->attributes['username'] = $info['nickname'];
+        else
+            $this->attributes['username'] = 'id'.$info['uid'];
 
-		$this->attributes['timezone'] = timezone_name_from_abbr('', $info['timezone']*3600, date('I'));;
+        $this->attributes['gender'] = $info['sex'] == 1 ? 'F' : 'M';
 
-		$this->attributes['photo'] = $info['photo'];
-		$this->attributes['photo_medium'] = $info['photo_medium'];
-		$this->attributes['photo_big'] = $info['photo_big'];
-		$this->attributes['photo_rec'] = $info['photo_rec'];*/
+        $this->attributes['city'] = $info['city'];
+        $this->attributes['country'] = $info['country'];
 
-		return true;
-	}
+        $this->attributes['timezone'] = timezone_name_from_abbr('', $info['timezone']*3600, date('I'));;
 
-	/**
-	 * Returns the error array.
-	 *
-	 * @param array $response
-	 * @return array the error array with 2 keys: code and message. Should be null if no errors.
-	 */
-	protected function fetchResponseError($response)
-	{
-		if (isset($response['error'])) {
-			return array(
-				'code' => is_string($response['error']) ? 0 : $response['error']['error_code'],
+        $this->attributes['photo'] = $info['photo'];
+        $this->attributes['photo_medium'] = $info['photo_medium'];
+        $this->attributes['photo_big'] = $info['photo_big'];
+        $this->attributes['photo_rec'] = $info['photo_rec'];*/
+
+        return true;
+    }
+
+    /**
+     * Returns the error array.
+     *
+     * @param array $response
+     * @return array the error array with 2 keys: code and message. Should be null if no errors.
+     */
+    protected function fetchResponseError($response)
+    {
+        if (isset($response['error'])) {
+            return array(
+                'code' => is_string($response['error']) ? 0 : $response['error']['error_code'],
 //				'message' => is_string($response['error']) ? $response['error'] : $response['error']['error_msg'],
 //				'message' => is_string($response['error']) ? $response['error'] : $response['error']['error_msg'],
-			);
-		} else {
-			return null;
-		}
-	}
+            );
+        } else {
+            return null;
+        }
+    }
 
-	/**
-	 * @param array $data
-	 * @return string|null
-	 */
-	public function getAccessTokenResponseError($data)
-	{
-		if (!isset($data['error'])) {
-			return null;
-		}
-		$error = $data['error'];
-		if (isset($data['error_description'])) {
-			$error .= ': ' . $data['error_description'];
-		}
-		return $error;
-	}
+    /**
+     * @param array $data
+     * @return string|null
+     */
+    public function getAccessTokenResponseError($data)
+    {
+        if (!isset($data['error'])) {
+            return null;
+        }
+        $error = $data['error'];
+        if (isset($data['error_description'])) {
+            $error .= ': ' . $data['error_description'];
+        }
+        return $error;
+    }
 
-	/**
-	 * Returns a class constant from ServiceInterface defining the authorization method used for the API.
-	 *
-	 * @return int
-	 */
-	public function getAuthorizationMethod()
-	{
-		return ServiceInterface::AUTHORIZATION_METHOD_QUERY_STRING;
-	}
+    /**
+     * Returns a class constant from ServiceInterface defining the authorization method used for the API.
+     *
+     * @return int
+     */
+    public function getAuthorizationMethod()
+    {
+        return ServiceInterface::AUTHORIZATION_METHOD_QUERY_STRING;
+    }
 
 }
